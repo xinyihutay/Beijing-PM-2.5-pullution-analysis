@@ -36,3 +36,16 @@ Summarize some overview statistics about PM2.5, like the numbers of days under e
 How other factors influence the levels of PM2.5? (Dew, pressure, wind, rain etc.) Analyze their correlation with PM2.5, maybe ,do regression/classification, trian the model(cross-validation).
 
 After understanding the influences of these factors have on PM2.5, try to come up with some approaches that could lower the value of PM2.5(improve air quality).
+
+Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
+
+```
+proj/
+├── lib/
+├── data/
+├── doc/
+├── figs/
+└── output/
+```
+
+Please see each subfolder for a README file.
