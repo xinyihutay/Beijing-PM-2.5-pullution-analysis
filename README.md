@@ -1,6 +1,6 @@
 # Beijing-PM-2.5-pullution-analysis
 
-Columbia University GR5223 group project
+Columbia University Spring 2019 GR5223 group project
 
 **Team members:**
 
