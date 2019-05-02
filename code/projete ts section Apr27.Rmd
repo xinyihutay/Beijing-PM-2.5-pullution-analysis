@@ -18,8 +18,8 @@ library(itsmr)
 library(forecast)
 library(dplyr)
 library(plyr)
-
-pm = fread("PRSA_data_2010.1.1-2014.12.31.csv")
+path = "~/Desktop/GR5223 Multivariate Stat Inference/Beijing-PM-2.5-pullution-analysis/data"
+pm = fread(paste0(path,"/PRSA_data_2010.1.1-2014.12.31.csv"))
 na_check = apply(is.na(pm),2,sum);na_check
 
 del = which(is.na(pm$pm2.5) == TRUE)
@@ -38,10 +38,15 @@ aggregate_pm = function(x){
 pm_daily  = ddply(pm25_time, .(year,month,day), aggregate_pm)
 colnames(pm_daily) = c("year","month","day","pm2.5")
 pm_daily = pm_daily$pm2.5
+#test = pm_daily[(round(length(pm_daily)*0.7)+1) : length(pm_daily)]
+#pm_daily = pm_daily[1:round(length(pm_daily)*0.7)]
+
 
 pm_monthly = ddply(pm25_time, .(year,month), aggregate_pm)
 colnames(pm_monthly) = c("year","month","pm2.5")
 pm_monthly = pm_monthly$pm2.5
+test = pm_monthly[(round(length(pm_monthly)*0.9)+1) : length(pm_monthly)]
+pm_monthly = pm_daily[1:round(length(pm_monthly)*0.9)]
 
 ```
 
@@ -77,6 +82,15 @@ Here we use function **auto.arima( )** in R package *forecast* to conduct the mo
 ```{r part 1 fit}
 fit_daily = auto.arima(ts(pm_daily))
 fit_daily$coef
+```
+
+```{r part 1 forecast, include=FALSE, eval=FALSE}
+plot(forecast(fit_daily,h=length(test)), lwd = 2)
+forecasting = forecast(fit_daily,h=length(test))
+pred_upper = forecasting$upper[,2]
+pred_lower = forecasting$lower[,2]
+PI = cbind(pred_lower, pred_upper)
+test - forecasting$mean
 ```
 To evaluate the quality of this fitted model, we need to perform several hypothesis tests on its fitted residuals. If the fitted model is a good fit, we should expect that the residuals behave like white noise.
 
@@ -242,6 +256,16 @@ matrix(data = round(c(fit_monthly_ma$aic,fit_monthly_ar$aic),3),
 fit_monthly_ar$coef
 
 ```
+
+```{r part 2 forecast, include=FALSE, eval=FALSE}
+plot(forecast(fit_monthly_ma,h=length(test)), lwd = 2)
+forecasting = forecast(fit_monthly_ma,h=length(test))
+pred_upper = forecasting$upper[,2]
+pred_lower = forecasting$lower[,2]
+PI = cbind(pred_lower, pred_upper)
+test - forecasting$mean
+```
+
 We prefer the model with smaller AIC value, so we choose MA(6) model.
 
 **Test of randomness:**
