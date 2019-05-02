@@ -1,0 +1,561 @@
+---
+title: 'GR5223 Project'
+output:
+  html_document: default
+  html_notebook: default
+  pdf_document: default
+---
+
+# Project plan
+
+>#**GR5223 Project**
+
+**Team members:**
+
+Xinyi Hu: xh2383
+
+Xinge Jia: xj2221
+
+Nikita Tourani:nrt2117
+\
+\
+**1. What is your main question/topic of interest for the group project? Why have you chosen this question/topic?**
+
+The data set that we are going to use is downloaded from https://archive.ics.uci.edu/ml/datasets/Beijing+PM2.5+Data, which includes the value of PM2.5 varied through time and some related predictor variables. PM2.5 refers to particulate matter in the atmosphere that have a diameter of less than 2.5 micrometers, and is widely regarded as an air pollutant that can be hazardous to human health. In this data set, hourly PM2.5 data of US Embassy in Beijing has been collected. The data set also includes seven other meteorological data attributes such as dew point, pressure, temperature, cumulated hours of rain etc.
+
+In this group project, our aim is to understand how these factors influence (interact with) the value of PM2.5 and learn about the correlation between the value of PM2.5 and time. Based on these results, we can try to propose some policy ideas and  practical solutions for PM2.5 reduction and prevention. 
+
+The reason why we are interested in these questions is that the air pollution problem has been a key cause of public concern, and has remained an unsolved issue in China for years. Two members of our team are from China and both of them have suffered from very unhealthy levels of PM2.5. Thus, we would like to examine the PM2.5 issue statistically and attempt to find a possible remedy for this issue.
+
+**2. What types of information/data are you planning on using in your project?**
+
+The data set that we are going to use is a multivariate data set including both categorial data and numerical data. Besides, this is a time-series data recorded per hour per day from 2010 to 2014. There are eight atmospheric attributes measured, including PM2.5 concentration.
+
+**3. How are your planning to carry out the analysis of the data/the project, i.e. which software/methods do you plan to use and, if applicable, what are you expecting to observe?**
+
+In this project, we will use R to perform the analysis. There are several methods that might be useful in building and selecting the appropriate model. The transformation of response variable and predictor variables, variable selection according to the Mallows Cp criterion and the value of AIC as well as multiple R-squared and hypothesis testing can be applied during our analysis. What's more, since it is a time-series data set, we will apply time series related methodologies to find the trend and make some predictions to complete the analysis. We are expecting to have the model that builds a relationship between the value of PM2.5 and other related factors.
+
+**4. Ideas:**
+
+Separate PM2.5 values into different levels according to Air Quality Guide for PM2.5 https://www.cnn.com/2017/05/04/asia/beijing-sand-storm-pollution-beyond-index/index.html, and the cluster months in each of the four years, to see the pattern of how PM2.5 values change according to the period of the year. Similarly, we will find out how the PM2.5 value changes within a 24 hour period. (Using some simple data exploring skills and sorting the data)
+
+We will then summarize some overview statistics about PM2.5, like the number of days under each PM2.5 level.
+
+We would also like to examine how other factors influence the levels of PM2.5 (ie. Dew, pressure, temperature, wind direction, wind speed, snow, rain). We will do this by analyzing their correlation with the PM2.5 value, do regression/classification, and train the model (cross-validation).
+
+After understanding how these factors influence PM2.5 values, we will try to propose some approaches/policies that could lower the value of PM2.5 (ie. improve air quality).
+
+There is some missing data, and we would like to filter the data before we start our analyses:
+
+
+# Process data
+
+```{r Clean data}
+library(data.table)
+library(tseries)
+library(forecast)
+library(dynlm)
+library(glmnet)
+library(ggplot2)
+pm = fread("PRSA_data_2010.1.1-2014.12.31.csv")
+#na_check = apply(is.na(pm),2,sum);na_check
+
+del = which(is.na(pm$pm2.5) == TRUE)
+pm_delete_na = pm[-del,]
+#apply(is.na(pm_delete_na),2,sum)
+pm25 = pm_delete_na[,-1]
+#dim(pm25)
+#range(pm25$pm2.5)
+names(pm25)
+X = pm25[,c("PRES","DEWP","TEMP","Is","Ir","Iws")]
+W = pm25$cbwd
+unique(W)
+W[which(W == "NW")] = 1
+W[which(W == "NE")] = 2
+W[which(W == "SE")] = 3
+W[which(W == "cv")] = 4
+
+pm_data = data.frame(pm25$pm2.5,X,Wind_dir = W)
+colnames(pm_data) = c("PM2.5","PRES","DEWP","TEMP","Snow","Rain","Wind_speed","Wind_dir")
+pm_data$Wind_dir = as.factor(pm_data$Wind_dir)
+tail(pm_data)
+names(pm_data)
+
+```
+
+# Time series error
+
+```{r regression with ARMA errors}
+#pm_data_w = data.frame(pm25$pm2.5,X,Wind_dir = W)
+#pm_w_ts = ts(pm_data_w)
+#unique(pm_w_ts[,8])
+
+pm_ts = ts(pm_data)
+fit = auto.arima(pm_ts[,1], xreg = as.matrix(pm_ts[,2:7]))
+print(fit)
+plot(ts(pm_data$PM2.5))
+
+cbind("Regression Errors" = residuals(fit, type="regression"),
+      "ARIMA errors" = residuals(fit, type="innovation")) %>%
+  autoplot(facets=TRUE)
+checkresiduals(fit)
+# Not a white noise, which is matched with the claim in the reference paper
+#set.seed(2019)
+#residules=arima.sim(model=list(ar=0.5,ma=c(0.1804,-0.0075)),n=nrow(pm_data))
+
+forecast_residule = forecast(fit, xreg=as.matrix(pm_ts[,2:7]))
+```
+
+
+# Fit regression model part
+
+```{r transformation}
+#transformation of predictor variable y
+
+model_1 = lm(PM2.5~.,data = pm_data)
+sum_1 = summary(model_1)
+sum_1$adj.r.squared
+AIC(model_1)
+qqnorm(rstudent(model_1));qqline(rstudent(model_1))
+
+
+pm_data_log = pm_data[which(pm_data$PM2.5 != 0),]
+log_data = pm_data_log
+log_data$PM2.5 = log(log_data$PM2.5)
+#sum(pm_data$PM2.5 == 0)
+model_2 = lm(PM2.5~.,data = log_data)
+sum_2 = summary(model_2)
+sum_2$coefficients
+sum_2$adj.r.squared
+AIC(model_2)
+BIC(model_2)
+qqnorm(rstudent(model_2));qqline(rstudent(model_2))
+
+```
+
+```{r ridge and lasso}
+
+data_matrix = model.matrix(PM2.5~., log_data)[,-1]
+lambda = 10^seq(-5,10, length = 200)
+
+ridge_fit = cv.glmnet(data_matrix, log_data$PM2.5, alpha = 0, lambda = lambda) 
+model_ridge = glmnet(data_matrix, log_data$PM2.5,lambda = lambda)
+
+plot(ridge_fit)
+opt_lambda_r = ridge_fit$lambda.min
+opt_lambda_r
+
+ridge_coe = predict(model_ridge, type = "coefficients", s = opt_lambda_r )
+ridge_coe
+# Compute R^2
+y_pred = predict(model_ridge, s = opt_lambda_r, newx = data_matrix)
+# Sum of Squares Total and Error
+sst = sum((log_data$PM2.5 - mean(log_data$PM2.5))^2)
+sse = sum((y_pred - log_data$PM2.5)^2)
+r_2 = 1 - sse / sst
+r_2
+sum_2$adj.r.squared
+# Slightly improve
+
+
+lasso_fit = cv.glmnet(data_matrix, log_data$PM2.5,alpha = 1, lambda = lambda)
+model_lasso = glmnet(data_matrix, log_data$PM2.5, alpha = 1, lambda = lambda)
+opt_lambda_l = lasso_fit$lambda.min
+opt_lambda_l
+
+plot(model_lasso, label = T)
+lasso_coef = predict(model_lasso, type = "coefficients", s = opt_lambda_l )
+lasso_coef
+sum_2$coefficients
+```
+
+```{r Model selection}
+library(leaps)
+library(bestglm)
+log_data1 = log_data[,c(2:8,1)]
+#levels(log_data$Wind_dir)
+bestglm(log_data1,IC="AIC")
+bestglm(log_data1,IC="BIC")
+min.model=lm(PM2.5 ~ 1,data=log_data1)
+full.model=formula(model_2)
+step(min.model,scope=full.model,direction=c("forward"))
+step(min.model,scope=full.model,direction=c("backward"))
+
+
+best_subset = regsubsets(PM2.5~., data = log_data1, method = "exhaustive")
+forward = regsubsets(PM2.5~., data = log_data1, method = "forward")
+backward = regsubsets(PM2.5~., data = log_data1, method = "backward")
+best = summary(best_subset)
+forw = summary(forward)
+back = summary(backward)
+
+plot(x = 1:8, y = best$rss, col = 2, pch = 2, type = "o", 
+     main = "Subset selection", xlab = "Number of variables", ylab = "RSS")
+points(x = 1:8, y = forw$rss, col = 3, pch = 3, type = "o")
+points(x = 1:8, y = back$rss, col = 4, pch = 4, type = "o")
+legend("topright", legend = c("Best subset", "Forward", "Backward"),
+       col = c(2,3,4), pch = c(2,3,4))
+
+
+op = par(mfrow = c(1,2))
+plot(x = 1:8, y = best$cp, type = "o", col = 2, 
+     xlab = "Number of variables", ylab = "Cp" )
+plot(x = 1:8, y = best$bic, type = "o", col = 3, 
+     xlab = "Number of variables", ylab = "BIC" )
+par(op)
+which.min(best$cp)
+which.min(best$bic)
+best$outmat
+
+
+op = par(mfrow = c(1,2))
+plot(x = 1:8, y = forw$cp, type = "o", col = 2, 
+     xlab = "Number of variables", ylab = "Cp" )
+plot(x = 1:8, y = forw$bic, type = "o", col = 3, 
+     xlab = "Number of variables", ylab = "BIC" )
+par(op)
+which.min(forw$cp)
+which.min(forw$bic)
+forw$outmat
+
+
+op = par(mfrow = c(1,2))
+plot(x = 1:8, y = back$cp, type = "o", col = 2, 
+     xlab = "Number of variables", ylab = "Cp" )
+plot(x = 1:8, y = back$bic, type = "o", col = 3, 
+     xlab = "Number of variables", ylab = "BIC" )
+par(op)
+which.min(back$cp)
+which.min(back$bic)
+back$outmat
+
+```
+
+
+
+
+```{r relationships}
+#relationships among quantitative variables
+#library(GGally)
+cor(log_data[,-c(1,8)])
+library(car)
+vif(model_2)
+# multicolinearity exists
+# consider to use shrinkage method
+```
+
+```{r Interaction}
+names(log_data) = c("Y","X1","X2","X3","X4","X5","X6","X7")
+names(pm_data)
+model_3 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X1*X2), data = log_data)  # pressure(X1) and dew(X2)
+sum_3 = summary(model_3)
+sum_2$coefficients
+sum_3$coefficients      # p-values of X1 and X2 are lower, and the interaction is significant
+sum_2$adj.r.squared     #0.413282
+sum_3$adj.r.squared     #0.434887, doesn't have much improvement
+AIC(model_2) #99005
+AIC(model_3) #97439 the value of AIC decreases but not much
+
+
+model_4 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X2*X3), data = log_data)  # Dew(X2) and temp(X3)
+sum_4 = summary(model_4)
+sum_4$coefficients      # p-values of X1 and X2 are lower, and the interaction is significant
+sum_4$adj.r.squared     #0.4250937, doesn't have much improvement, less better than model_3
+AIC(model_4) #98156 less better than model_3
+
+
+model_5 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X2*X4), data = log_data)  # Dew(X2) and Snow(X4)
+sum_5 = summary(model_5)
+sum_5$adj.r.squared     #0.41349, has no improvement,
+AIC(model_5) #98991 less better than model_3
+
+model_6 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X2*X5)+I(X4*X5), data = log_data)  # Dew(X2) and rain(X4), snow and rain(X5)
+sum_6 = summary(model_6)
+sum_6$adj.r.squared     #0.413282 has no improvement
+AIC(model_6) #99000 no improvement
+
+model_7 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X1*X6), data = log_data)  # pressure(X1) and wind speed(X6)
+sum_7 = summary(model_7)
+sum_7$adj.r.squared     #0.4150446 has no improvement
+AIC(model_7) #98880 not much improvement
+
+model_8 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X1*X3), data = log_data) #pressure(X1) and temp(X3)
+sum_8 = summary(model_8)
+sum_8$adj.r.squared     #0.422 not much improvement
+AIC(model_8) # 98370 not much improvement
+
+model_9 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X1*X2)+I(X1*X3), data = log_data) #pressure(X1) and temp(X3)
+sum_9 = summary(model_9)
+sum_9$adj.r.squared     #0.436 not much improvement
+AIC(model_9) #97325 not much improvement
+
+# No interaction need to be added to the model
+```
+
+```{r Ploy}
+model_3 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X1*X1)+I(X2*X2)+I(X3*X3)+I(X4*X4)+I(X5*X5)+I(X6*X6), data = log_data)  # pressure(X1) and dew(X2)
+sum_3 = summary(model_3)
+#sum_2$coefficients
+sum_3$coefficients      # p-values of X1 and X2 are lower, and the interaction is significant
+sum_2$adj.r.squared     #0.413282
+sum_3$adj.r.squared     #0.4410534, doesn't have much improvement
+
+model_4 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X1*X1), data = log_data)  # pressure(X1) and dew(X2)
+sum_4 = summary(model_4)
+sum_4$adj.r.squared     #0.4278366, doesn't have much improvement
+
+model_5 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X2*X2), data = log_data)  # pressure(X1) and dew(X2)
+sum_5 = summary(model_5)
+sum_5$adj.r.squared     # 0.4229174, doesn't have much improvement
+
+
+model_6 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X3*X3), data = log_data)  # pressure(X1) and dew(X2)
+sum_6 = summary(model_6)
+sum_6$adj.r.squared     # 0.4146235, doesn't have much improvement
+
+model_7 = lm(Y~X1+X2+X3+X4+X5+X6+X7+I(X4*X4), data = log_data)  # pressure(X1) and dew(X2)
+sum_7 = summary(model_7)
+sum_7$adj.r.squared     # 0.4133083, doesn't have much improvement
+
+```
+
+
+
+```{r}
+#y and quantitative variables:
+
+# y and X1(pres)
+# With line
+boxplot(Y~X1, data = log_data)
+abline(lm(Y ~ X1, data = log_data),col="purple")
+
+# With smoother
+boxplot(Y~X1, data = log_data)
+lines(supsmu(log_data$X1,log_data$Y),col="purple")
+
+poly.model.1 <- lm(Y~X1+X2+X3+X4+X5+X6+X7+poly(X1,2),data = log_data)
+sum_poly1 <- summary(poly.model.1)
+sum_poly1$adj.r.squared #0.428 doesn't have much improvement
+AIC(poly.model.1) # 97957 doesn't have much improvement
+
+# y and X2(dew)
+# With line
+boxplot(Y~X2, data = log_data)
+abline(lm(Y~X2, data = log_data),col="purple")
+
+# With smoother
+boxplot(Y~X2, data = log_data)
+lines(supsmu(log_data$X2,log_data$Y),col="purple")
+
+poly.model.2 <- lm(Y~X1+X2+X3+X4+X5+X6+X7+sqrt(abs(X2)),data = log_data)
+sum_poly2 <- summary(poly.model.2)
+sum_poly2$adj.r.squared #0.424 doesn't have much improvement
+AIC(poly.model.2)# 98240 doesn't have uch improvement
+
+# y and X3(temp)
+# With line
+boxplot(Y~X3, data = log_data)
+abline(lm(Y~X3, data = log_data),col="purple")
+
+# With smoother
+boxplot(Y~X3, data = log_data)
+lines(supsmu(log_data$X3,log_data$Y),col="purple")
+
+poly.model.3 <- lm(Y~X1+X2+X3+X4+X5+X6+X7+poly(X3,2),data = log_data)
+sum_poly3 <- summary(poly.model.3)
+sum_poly3$adj.r.squared #0.415 doesn't have much improvement
+AIC(poly.model.3) # 98910 doesn't have much improvement
+
+# y and X4(snow)
+# With line
+boxplot(Y~X4, data = log_data)
+abline(lm(Y~X4, data = log_data),col="purple")
+
+# With smoother
+boxplot(Y~X4, data = log_data)
+lines(supsmu(log_data$X4,log_data$Y),col="purple")
+
+# y and X5(rain)
+# With line
+boxplot(Y~X5, data = log_data)
+abline(lm(Y~X5, data = log_data),col="purple")
+
+# With smoother
+boxplot(Y~X5, data = log_data)
+lines(supsmu(log_data$X5,log_data$Y),col="purple")
+
+# y and X6(wind speed)
+# With line
+boxplot(Y~X6, data = log_data)
+abline(lm(Y~X6, data = log_data),col="purple")
+
+# With smoother
+boxplot(Y~X6, data = log_data)
+lines(supsmu(log_data$X6,log_data$Y),col="purple")
+
+```
+
+
+
+```{r}
+#relationship between quantitative variabels and qualitative variables
+# First define logical variables 
+nw <- pm25$cbwd=="NW"
+cv <- pm25$cbwd=="cv"
+se <- pm25$cbwd=="SE"
+ne <- pm25$cbwd=="NE"
+
+#X1(pres) and X7(cbwd)
+# Scatter plot with smoothers for each cbwd level
+plot(log_data$X1,log_data$Y,col="lightgrey",xlab="pres",ylab="log(pm2.5)")
+abline(lm((log_data$Y)[nw]~log_data$X1[nw]),col=2)
+abline(lm((log_data$Y)[cv]~log_data$X1[cv]),col=3)
+abline(lm((log_data$Y)[se]~log_data$X1[se]),col=4)
+abline(lm((log_data$Y)[ne]~log_data$X1[ne]),col=5)
+legend("topleft",legend=c("nw","cv","se","ne"),fill=2:5)
+
+inter.model.1 <- lm(Y~X1+X2+X3+X4+X5+X6+X7+X1*X7,data=log_data)
+summary(inter.model.1)
+sum_inter1<-summary(inter.model.1)
+sum_inter1$adj.r.squared #0.416 doesn't have improvement
+AIC(inter.model.1)# 98790 dpesn't have improvment
+
+#X2(dewp) and X7(cbwd)
+plot(log_data$X2,log_data$Y,col="lightgrey",xlab="dewp",ylab="log(pm2.5)")
+abline(lm((log_data$Y)[nw]~log_data$X2[nw]),col=2)
+abline(lm((log_data$Y)[cv]~log_data$X2[cv]),col=3)
+abline(lm((log_data$Y)[se]~log_data$X2[se]),col=4)
+abline(lm((log_data$Y)[ne]~log_data$X2[ne]),col=5)
+legend("topleft",legend=c("nw","cv","se","ne"),fill=2:5)
+
+inter.model.2 <- lm(Y~X1+X2+X3+X4+X5+X6+X7+X2*X7,data=log_data)
+summary(inter.model.2)
+sum_inter2<-summary(inter.model.2)
+sum_inter2$adj.r.squared #0.415 doesn't have improvement
+AIC(inter.model.2)# 98861 dpesn't have improvment
+
+#X3(temp) and X7(cbwd)
+plot(log_data$X3,log_data$Y,col="lightgrey",xlab="temp",ylab="log(pm2.5)")
+abline(lm((log_data$Y)[nw]~log_data$X3[nw]),col=2)
+abline(lm((log_data$Y)[cv]~log_data$X3[cv]),col=3)
+abline(lm((log_data$Y)[se]~log_data$X3[se]),col=4)
+abline(lm((log_data$Y)[ne]~log_data$X3[ne]),col=5)
+legend("topleft",legend=c("nw","cv","se","ne"),fill=2:5)
+
+inter.model.3 <- lm(Y~X1+X2+X3+X4+X5+X6+X7+X3*X7,data=log_data)
+summary(inter.model.3)
+sum_inter3<-summary(inter.model.3)
+sum_inter3$adj.r.squared #0.414 doesn't have improvement
+AIC(inter.model.3)# 98929 dpesn't have improvment
+
+#X4(snow) and X7(cbwd)
+plot(log_data$X3,log_data$Y,col="lightgrey",xlab="snow",ylab="log(pm2.5)")
+abline(lm((log_data$Y)[nw]~log_data$X4[nw]),col=2)
+abline(lm((log_data$Y)[cv]~log_data$X4[cv]),col=3)
+abline(lm((log_data$Y)[se]~log_data$X4[se]),col=4)
+abline(lm((log_data$Y)[ne]~log_data$X4[ne]),col=5)
+legend("topleft",legend=c("nw","cv","se","ne"),fill=2:5)
+
+inter.model.4 <- lm(Y~X1+X2+X3+X4+X5+X6+X7+X4*X7,data=log_data)
+summary(inter.model.4)
+sum_inter4<-summary(inter.model.4)
+sum_inter4$adj.r.squared #0.414 doesn't have improvement
+AIC(inter.model.4)# 98965 dpesn't have improvment
+
+#X5(rain) and X7(cbwd)
+plot(log_data$X5,log_data$Y,col="lightgrey",xlab="rain",ylab="log(pm2.5)")
+abline(lm((log_data$Y)[nw]~log_data$X5[nw]),col=2)
+abline(lm((log_data$Y)[cv]~log_data$X5[cv]),col=3)
+abline(lm((log_data$Y)[se]~log_data$X5[se]),col=4)
+abline(lm((log_data$Y)[ne]~log_data$X5[ne]),col=5)
+legend("topleft",legend=c("nw","cv","se","ne"),fill=2:5)
+
+inter.model.5 <- lm(Y~X1+X2+X3+X4+X5+X6+X7+X5*X7,data=log_data)
+summary(inter.model.5)
+sum_inter5<-summary(inter.model.5)
+sum_inter5$adj.r.squared #0.415 doesn't have improvement
+AIC(inter.model.5)# 99005 dpesn't have improvment
+
+#X6(wind speed) and X7(cbwd)
+plot(log_data$X6,log_data$Y,col="lightgrey",xlab="wind speed",ylab="log(pm2.5)")
+abline(lm((log_data$Y)[nw]~log_data$X6[nw]),col=2)
+abline(lm((log_data$Y)[cv]~log_data$X6[cv]),col=3)
+abline(lm((log_data$Y)[se]~log_data$X6[se]),col=4)
+abline(lm((log_data$Y)[ne]~log_data$X6[ne]),col=5)
+legend("topleft",legend=c("nw","cv","se","ne"),fill=2:5)
+
+inter.model.6 <- lm(Y~X1+X2+X3+X4+X5+X6+X7+X6*X7,data=log_data)
+summary(inter.model.6)
+sum_inter6<-summary(inter.model.6)
+sum_inter6$adj.r.squared #0.419 doesn't have improvement
+AIC(inter.model.6)# 98596 dpesn't have improvment
+
+```
+
+**model validation**
+```{r}
+
+# Model validation 
+
+# Choose training and validation set
+
+set.seed(0)
+round(.2*nrow(log_data))
+index <- sample(1:nrow(log_data),8351,replace = F)
+train.data <- log_data[-index,]
+data <- train.data 
+test.data <- log_data[index,]
+
+# Compute MSPR
+
+#Below we compute the MSPR using our final model trained from the training set on the test set. First fit the final model on the training set. 
+
+bad.final.model <- lm(Y~X1+X2+X3+X4+X5+X6+X7,data= train.data)
+
+# Compute MSE 
+MSE <- sum((residuals(bad.final.model))^2)/(nrow(train.data)-7)
+
+# For comparison, we can compute MSE of the earlier final model
+MSE.earler <- sum((residuals(model_2))^2)/(nrow(log_data)-7)
+
+names(train.data[,-1])
+
+Y.test <- test.data[,1]
+X.test <- test.data[,-1]
+n.test <- nrow(X.test)
+n.test
+Y.hat.test <- predict(bad.final.model,newdata = X.test)
+length(Y.hat.test)==n.test
+
+
+# MSPR
+MSPR <- mean((Y.test-Y.hat.test)^2)
+
+# Compare 
+round(c(MSPR=MSPR,MSE=MSE,MSEearler=MSE.earler),4)
+
+```
+
+**plot of the final model**
+
+```{r}
+model.final<-model_2
+
+boxplot(log_data$Y~log_data$X7,main="PM2.5 by wind direction",ylab="PM2.5")
+
+qqnorm(rstudent(model.final),main="QQ-Plot")
+abline(a=0,b=1,lty=3,col = "red")
+
+plot(1:length(log_data$Y),rstudent(model.final),main="Line Plot", ylab="Deleted Residuals")
+abline(h=0,lty=3)
+lines(1:length(log_data$Y),rstudent(model.final), col = 2)
+
+plot(predict(model.final),rstudent(model.final),main="Residual Plot",xlab="Y-hat",ylab="Deleted Residuals")
+abline(h=0,lty=2)
+lines(supsmu(predict(model.final),rstudent(model.final)),col=2)
+
+```
+
+
+
+

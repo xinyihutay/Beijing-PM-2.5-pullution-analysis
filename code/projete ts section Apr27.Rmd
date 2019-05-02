@@ -1,0 +1,325 @@
+---
+title: ''
+output:
+  word_document: default
+---
+# Time series analysis section
+
+```{r include=FALSE}
+knitr::opts_chunk$set(fig.align = "center") 
+```
+This section is mainly about performing time series analysis on average PM 2.5 daily records and monthly records respectively. Our target in this section is to find out the patterns and features of the PM 2.5 values under different frequencies. 
+
+After cleaning the data, we average the PM 2.5 values within 24 hours per day and average the PM 2.5 values in each month respectively. First we analyze the daily PM 2.5 values.
+```{r Clean data, include = FALSE}
+library(data.table)
+library(tseries)
+library(itsmr)
+library(forecast)
+library(dplyr)
+library(plyr)
+
+pm = fread("PRSA_data_2010.1.1-2014.12.31.csv")
+na_check = apply(is.na(pm),2,sum);na_check
+
+del = which(is.na(pm$pm2.5) == TRUE)
+pm[del,"pm2.5"] = 0
+#pm_delete_na = pm[-del,]
+#apply(is.na(pm_delete_na),2,sum)
+#pm25 = pm_delete_na[,-1]
+pm25 = pm[,-1]
+apply(is.na(pm25),2,sum);na_check
+#names(pm25)
+
+pm25_time = as.data.frame(pm25[,c(1,2,3,4,5)])
+aggregate_pm = function(x){
+  return(mean(x$pm2.5))
+}
+pm_daily  = ddply(pm25_time, .(year,month,day), aggregate_pm)
+colnames(pm_daily) = c("year","month","day","pm2.5")
+pm_daily = pm_daily$pm2.5
+
+pm_monthly = ddply(pm25_time, .(year,month), aggregate_pm)
+colnames(pm_monthly) = c("year","month","pm2.5")
+pm_monthly = pm_monthly$pm2.5
+
+```
+
+## Part1: Daily PM 2.5 values 
+
+Before doing any further analysis, we first plot the daily values of PM 2.5 from 01/01/2010 through 31/12/2014:
+
+```{r fig.width=6, fig.height=4,echo=FALSE}
+plot(1:length(pm_daily),ts(pm_daily),type="l",pch=22,lty=1,pty=2,col = "grey",
+     ylab="PM2.5 concentration(ug/m^3)",xlab = "")
+abline(h=mean(pm_daily),col = "red", lwd = 3, lty = 4)
+```
+The time series plot shows that changing variablity exists in the daily PM 2.5 data. To remove the changing variability, we perform logarithm on our data and then plot the ACF and PACF of the data:
+```{r fig.width=8, fig.height=3,include=FALSE}
+pm_daily = log(pm_daily[which(pm_daily != 0)])
+plot(1:length(pm_daily),ts(pm_daily),type="l",pch=22,lty=1,pty=2,col="grey",
+     ylab="PM2.5 concentration(ug/m^3)",xlab = "Figure 1-2")
+abline(h=mean(pm_daily),col = "red", lwd = 3, lty = 4)
+```
+
+```{r fig.width=8, fig.height=3, echo=FALSE}
+op = par(mfrow=c(1,2))
+acf(pm_daily,lag.max = 40,
+         xlab = "time lag", ylab = 'ACF',main='ACF')
+acf(pm_daily,lag.max = 40, type = "partial",
+         xlab = "time lag", ylab = 'PACF', main='PACF')
+par(op)
+```
+Above plots show that both the ACF(autocorrelation function) and PACF(partial autocorrelation function) of daily PM 2.5 records have quick decays so we do not need to do differencing on the data. Also note that in the ACF plot(left), the values of ACF are outside the bounds at lag 1 and lag 2, which suggests that we could fit a MA(2) (moving average 2) model on the records.
+
+Here we use function **auto.arima( )** in R package *forecast* to conduct the model fitting:
+
+```{r part 1 fit}
+fit_daily = auto.arima(ts(pm_daily))
+fit_daily$coef
+```
+To evaluate the quality of this fitted model, we need to perform several hypothesis tests on its fitted residuals. If the fitted model is a good fit, we should expect that the residuals behave like white noise.
+
+**Test of randomness:**
+
+We use Box-Pierce test to test the randomness of the residuals of daily PM 2.5 data.
+
+Box-Pierce test:
+
+1. $H_0:$ the data are independently distributed.
+
+2. Under $H_0$, the test statistic is $Q=n\sum_{h=1}^k\hat{\rho}(h)\sim approx. \chi_k^2$.
+
+3. Reject $H_0$ if $Q>\chi_{k,1-\alpha}^2$ at level $\alpha$.
+
+```{r part 1 randomness, echo=FALSE}
+daily_res = fit_daily$residuals
+Box.test(daily_res,lag=20,type="Box-Pierce") #p-value = 0.9885
+#Box.test(daily_res,lag=20,type="Ljung-Box") #p-value = 0.988
+# Fail to reject H0, residuals are independent
+```
+
+The p-value of Box-Pierce test on the residuals is 0.9885 which is larger than the significance level $\alpha=0.05$, so we fail to reject $H_0$, the residuals are independently distributed.
+
+**Test of normality:**
+
+We first use normal probability plot to evaluate the normality of our data and then use Shapiro_Wilk test to do the hypothesis testing.
+
+The Shapiro-Wilk test is a test of normality in frequentist statistics:
+
+1. $H_0:$ data are normally distributed.
+
+2. Under $H_0$, the test statistic is $W = \frac{(\sum_{i=1}^na_ix_{(i)})^2}{\sum_{i=1}^n(x_i-\bar{x})^2}$,where $x_{(i)}$ is the $i^{th}$ order statistic and $\bar{x}$ is the sample mean.
+
+3. Reject $H_0$ if $Q>\chi_{k,1-\alpha}^2$ at level $\alpha$.
+
+```{r part 1 qq plot, fig.width=8, fig.height=4,echo=FALSE}
+#library(TSA)
+#McLeod.Li.test(y=daily_res,gof.lag=20) # in package 'TSA'
+#detach("package:TSA", unload=TRUE)
+qqnorm(daily_res); qqline(daily_res)
+```
+
+```{r part 1 shapiro, echo=FALSE}
+shapiro.test(daily_res)   #p-value < 2.2e-16
+# Reject H0, residuals are not normally distributed
+#jarque.bera.test(daily_res) # in package 'tseries'  p-value < 2.2e-16
+#reject H0, residuals are not normally distributed
+```
+
+The Normal Q-Q plot shows that the points are not approximately lie on the $y=x$ line and heavy tails exist on both sides. Also Shapiro-Wilk test gives us a very small p-value. Hence, we should reject the null hypothesis and conclude that residuals are not normally distributed.
+
+Finally, we compute the sample mean and sample variance of the residuals that are -0.00039(almost zero) and 0.55617 respectively. Therefore,the residuals are not Gaussian white noise, but are independently distributed with sample mean 0 and sample variance 0.55617.
+
+```{r part 1 mean and variance, include=FALSE}
+matrix(data = c(round(mean(daily_res),5),round(var(daily_res),5)),
+       nrow = 1, byrow = F, dimnames = list(c("Value"),c("Mean","Variance")))
+plot(daily_res, type = "l", 
+     main = "Residuals of fitted MA(2) model", 
+     xlab='', ylab='Residuals')
+```
+Using the same methods but now we're doing testing on daily PM 2.5 data.
+
+**Test of randomness:**
+
+```{r part 1 daily randomness,echo=FALSE}
+Box.test(pm_daily,lag=20,type="Box-Pierce") #p-value < 2.2e-16
+#library(TSA)
+#McLeod.Li.test(y=daily_res,gof.lag=20) # in package 'TSA'
+```
+The p-value of Box-Pierce test on the daily PM 2.5 data is $2.2 \times10^{-16}$, so we  reject $H_0$, i.e. the daily PM 2.5 data are dependent.
+
+**Test of normality:**
+```{r part 1 daily normality, echo=FALSE}
+#detach("package:TSA", unload=TRUE)
+#qqnorm(pm_daily); qqline(pm_daily)
+shapiro.test(pm_daily)   #p-value = 1.261e-12
+# Reject H0, average daily pm2.5 are not normally distributed
+#jarque.bera.test(pm_daily) # in package 'tseries'  p-value = 2.35e-13
+# Reject H0, average daily pm2.5 are not normally distributed
+```
+The p-value of Shapiro-Wilk test on the daily PM 2.5 data is $1.261 \times10^{-12}$, so we reject $H_0$, i.e. the daily PM 2.5 data are not  normally distributed. And this is not surprising because the result of normality test on the fitted residuals shows that the normality is violated.
+
+**Test of stationarity:**
+
+Now we use Augmented Dickey-Fuller test to test whether the daily PM 2.5 data are stationary time series process(whether a unit root is present in a time series sample):
+
+Augmented Dickey-Fuller test:
+
+1. The testing procedure is applied to the model:$\Delta y_t=\alpha+\beta t+\gamma y_{t-1}+\delta_1\Delta y_{t-1}+\ldots+\delta_{p-1}\Delta y_{t-p+1}+\epsilon_t$, where $\alpha$ is a constant, $\beta$ is the coefficient on a time trend and $p$ is the lag order of the autoregressive process.
+
+2. Hypothesis: $H_0$: $\gamma=0$ (the time series data are **not** stationary) $vs.\ H_a:\ \gamma < 0$ (the time series data are stationary).
+
+3. Under $H_0$, the test statistic is $DF_\tau = \frac{\hat{\gamma}}{SE(\hat{\gamma})}$ 
+
+```{r part 1 stationarity, echo=FALSE,warning=FALSE}
+adf_daily = adf.test(pm_daily)  #p-value = 0.01
+adf_daily
+# Reject H0, average daily pm2.5 values are stationary
+```
+The p-value of Dickey-Fuller test on the daily PM 2.5 data is 0.01, so we reject $H_0$, i.e. the daily PM 2.5 data are stationary time series process. 
+
+## Part 2: Monthly PM 2.5 values
+
+In this section, we are going to do time series analysis on monthly PM 2.5 data by averaging the PM 2.5 values in each month. The analysis approach is very similar to the last section, first we fit the monthly data a time series model and then perform hypothesis tests on the fitted residuals and the data itself.
+
+```{r fig.width=8, fig.height=3,include=FALSE}
+op = par(mfrow=c(1,2))
+plot(1:length(pm_monthly),ts(pm_monthly),type="l",pch=22,lty=1,pty=2,
+     ylab="PM2.5 concentration(ug/m^3)",xlab = "Monthly data")
+abline(h=mean(pm_monthly),col = "red", lwd = 3, lty = 4)
+
+pm_monthly = log(pm_monthly[which(pm_monthly != 0)])
+plot(1:length(pm_monthly),ts(pm_monthly),type="l",pch=22,lty=1,pty=2,
+     ylab="PM2.5 concentration(ug/m^3)",xlab = "log Monthly data")
+abline(h=mean(pm_monthly),col = "red", lwd = 3, lty = 4)
+par(op)
+```
+
+```{r fig.width=8, fig.height=3,echo=FALSE}
+op = par(mfrow=c(1,2))
+# the stationary signal and ACF
+acf(pm_monthly,lag.max = 40,
+         xlab = "lag #", ylab = 'ACF',main=' ')
+# the trend signal and ACF
+acf(pm_monthly,lag.max = 40, type = "partial",
+         xlab = "lag #", ylab = 'PACF', main=' ')
+par(op)
+```
+The ACF and PACF shown in the figure above are suggestive of an MA(6) or AR(6) model, as the value of ACF drops dramatically after lag 6 while the value of PACF has a sharp decrease after lag 5. Then we can use function **Arima( )** in R package *forecast* to conduct the model fitting:
+
+```{r part 2 fit}
+fit_monthly_ma = Arima(pm_monthly,order=c(0,0,6))
+fit_monthly_ar = Arima(pm_monthly,order=c(6,0,0))
+```
+
+```{r order selection, include=FALSE,eval=FALSE}
+aic_ma = c()
+for (i in 1:10){
+  fit = Arima(pm_monthly,order = c(0,0,i))
+  aic_ma[i] = fit$aic
+}
+
+aic_ar = c()
+for (i in 1:10){
+  fit = Arima(pm_monthly,order = c(i,0,0))
+  aic_ar[i] = fit$aic
+}
+which.min(aic_ma)
+which.min(aic_ar)
+```
+
+Here we use **AIC**(Akaike information criterion) to choose which model that we prefer to use for further analysis. The AIC is an estimator of the relative quality of statistical models for a given set of data. Given a collection of models for the data, AIC estimates the quality of each model, relative to each of the other models. Thus, AIC provides a means for model selection.(Wiki link:https://en.wikipedia.org/wiki/Akaike_information_criterion)
+
+Model selection for MA(q) model:
+\[AIC = -2log(Maximum\ Gaussian\ likelihood) + 2(q+1)\]
+Model selection for AR(p) model:
+\[AIC = -2log(Maximum\ Gaussian\ likelihood) + 2(p+1)\]
+```{r echo=FALSE}
+matrix(data = round(c(fit_monthly_ma$aic,fit_monthly_ar$aic),3),
+       nrow = 1, ncol = 2,
+       dimnames = list("AIC",c("MA(6)","AR(6)")))
+fit_monthly_ar$coef
+
+```
+We prefer the model with smaller AIC value, so we choose MA(6) model.
+
+**Test of randomness:**
+```{r part 2 randomness,echo=FALSE}
+monthly_res = fit_monthly_ma$residuals
+Box.test(monthly_res,lag=20,type="Box-Pierce") # p-value = 0.9851
+#Box.test(monthly_res,lag=20,type="Ljung-Box") #p-value = 0.02974
+# Fail to reject H0, residuals are independent
+#library(TSA)
+#McLeod.Li.test(y=daily_res,gof.lag=20) # in package 'TSA'
+#detach("package:TSA", unload=TRUE)
+```
+The p-value of Box-Pierce test on the residuals is 0.9851 which is larger than the significance level $\alpha=0.05$, so we fail to reject $H_0$, i.e. the residuals are independently distributed.
+
+**Test of normality:**
+
+```{r part 2 normality, echo=FALSE}
+#qqnorm(monthly_res); qqline(monthly_res)
+shapiro.test(monthly_res)   #p-value = 0.4591
+# Fail to reject H0, residuals are normally distributed
+#jarque.bera.test(monthly_res) # in package 'tseries'  p-value = 0.2791
+#Fail to reject H0, residuals are normally distributed
+```
+The p-value is 0.4691, we should fail to reject $H_0$, residuals are normally distributed.
+
+```{r part 2 mean and variance, include=FALSE}
+matrix(data = c(round(mean(monthly_res),5),round(var(monthly_res),5)),
+       byrow = F, nrow = 1, dimnames = list(c("value"),c("Mean","Variance")))
+```
+Hence, the residuals are Gaussian white noise, i.e. independently distributed with sample mean -0.00218 and sample variance 0.0025.
+
+Next, we test the randomness, normality and stationarity of the monthly PM 2.5 records.
+```{r part 2 monthly, echo=FALSE,warning=FALSE}
+Box.test(pm_monthly,lag=20,type="Box-Pierce") #p-value = 0.1197
+#Box.test(pm_monthly,lag=20,type="Ljung-Box") # p-value = 0.02974
+# Fail to reject H0, average daily pm2.5 value are independent
+#library(TSA)
+
+#qqnorm(pm_monthly); qqline(pm_monthly)
+shapiro.test(pm_monthly)   #p-value = 0.8307
+# Fail to reject H0, average daily pm2.5 are normally distributed
+#jarque.bera.test(pm_monthly) # in package 'tseries'  p-value = 0.6138
+# Fail to reject H0, average daily pm2.5 are normally distributed
+
+adf_monthly = adf.test(pm_monthly)  #p-value = 0.04378
+adf_monthly
+# Reject H0, average daily pm2.5 values are stationary
+```
+
+According to the output, we conclude that monthly PM 2.5 data are stationary time series process, and they are independently and normally distributed.
+
+```{r include=FALSE,eval=FALSE}
+plot(forecast(fit_monthly_ma,h=10))
+plot(forecast(pm_daily[10000:length(pm_daily)],model=fit_daily))
+
+```
+
+## Summary
+
+Fitting daily PM 2.5 data by MA(2) model, we obtain non-Gaussian but independently distributed noise and the data itself is stationary, dependent but non normal distributed.
+
+Fitting monthly PM 2.5 data by MA(6) model, the fitted residuals are normally and independently distributed. And the monthly PM 2.5 data are stationary and independent Gaussian process.
+
+We want the fitted residuals to bahave like Gaussian white noise, thusly we consider that the fitted model MA(6) using monthly PM 2.5 data might be a good fit, while the fitted model MA(2) using daily PM 2.5 data does not work well. To build a better time series model for daily PM 2.5 data, one might need to consider more complicated time series models. Compare the AIC and RMSE (Root Mean Square Error: $RMSE=\sqrt{\frac{1}{n}\sum_{j=1}^n(y_j-\hat{y_j})^2}$) of two fitted models, fitted model MA(6) has much smaller AIC value and lower RMSE.
+
+```{r include=FALSE}
+fit_daily_error = summary(fit_daily)
+fit_monthly_error = summary(fit_monthly_ma)
+fit_daily_rmse = fit_daily_error[2]
+fit_monthly_rmse = fit_monthly_error[2]
+```
+
+```{r echo=FALSE}
+matrix(data = round(c(fit_daily$aic,fit_monthly_ma$aic,
+                fit_daily_rmse,fit_monthly_rmse),3),
+       nrow = 2, byrow = F,
+       dimnames = list(c("Daily PM 2.5","Monthly PM 2.5"),c("AIC","RMSE")))
+```
+
+Last but not least, the time series analysis that we have performed in this project is naive due to the lack of knowledge and practical experience. To make more precise time seires models on these two records, one could consider a seasonal ARMA model or doing (parametic or non-parametric) regression with ARIMA errors, which requires more advanced knowledge related to these topics.
+
