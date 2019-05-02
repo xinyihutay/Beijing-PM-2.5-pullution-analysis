@@ -37,15 +37,14 @@ How other factors influence the levels of PM2.5? (Dew, pressure, wind, rain etc.
 
 After understanding the influences of these factors have on PM2.5, try to come up with some approaches that could lower the value of PM2.5(improve air quality).
 
-Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
+This folder is orgarnized as follows.
 
 ```
 proj/
-├── lib/
+├── code/
 ├── data/
-├── doc/
-├── figs/
-└── output/
+├── document/
+└── reference/
 ```
 
 Please see each subfolder for a README file.
