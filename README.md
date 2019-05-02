@@ -3,6 +3,7 @@
 Columbia University GR5223 group project
 
 **Team members:**
+
 Xinyi Hu: xh2383
 
 Xinge Jia: 
