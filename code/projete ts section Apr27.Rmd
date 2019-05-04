@@ -45,8 +45,8 @@ pm_daily = pm_daily$pm2.5
 pm_monthly = ddply(pm25_time, .(year,month), aggregate_pm)
 colnames(pm_monthly) = c("year","month","pm2.5")
 pm_monthly = pm_monthly$pm2.5
-test = pm_monthly[(round(length(pm_monthly)*0.9)+1) : length(pm_monthly)]
-pm_monthly = pm_daily[1:round(length(pm_monthly)*0.9)]
+#test = pm_monthly[(round(length(pm_monthly)*0.9)+1) : length(pm_monthly)]
+#pm_monthly = pm_daily[1:round(length(pm_monthly)*0.9)]
 
 ```
 
