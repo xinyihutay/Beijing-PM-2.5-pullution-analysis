@@ -1,6 +1,6 @@
 # Under the Dome -- Beijing PM2.5 Air Pollution Analysis Using Time Series Analysis and Linear Regression
 
-![image](figs/beijing_cbd.jpg)
+![image](figs/beijing_pm2.5.jpg)
 
 ## Columbia University 
 **Spring 2019 GR5223 Group project**
