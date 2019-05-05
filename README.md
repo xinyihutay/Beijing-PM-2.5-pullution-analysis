@@ -14,15 +14,15 @@ Xinge Jia: xj2221
 Nikita Tourani:nrt2117
 
 
-## Main topic of interest for this group project:
+## Main topic:
 
 China has faced a severe and unsolved air pollution problem for years, with PM2.5 being the main pollutant.
 
 Two members of our team are from China and both of them have suffered from very unhealthy level of PM2.5. Thus, we want to know more about PM2.5 in a statistical way and attempt to find remedy for this issue.
 
-## Data that we used in this project:
+## Data:
 
-The data set that we are going to use is downloaded from https://archive.ics.uci.edu/ml/datasets/Beijing+PM2.5+Data. In this data set, hourly PM2.5 data of US Embassy in Beijing has been collected. The data set also includes meteorological data such as dew point, temperature, cumulated hours of rain etc.
+The data set that we used is downloaded from https://archive.ics.uci.edu/ml/datasets/Beijing+PM2.5+Data. In this data set, hourly PM2.5 data of US Embassy in Beijing has been collected. The data set also includes meteorological data such as dew point, temperature, cumulated hours of rain etc.
 
 ## Project summary:
 
