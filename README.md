@@ -43,6 +43,7 @@ This folder is orgarnized as follows.
 
 ```
 proj/
+├── Completed version/
 ├── code/
 ├── data/
 ├── document/
