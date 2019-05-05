@@ -8,7 +8,7 @@ output: pdf_document
 **Team members:**
 Xinyi Hu: xh2383
 
-Xinge Jia: 
+Xinge Jia: xj2221
 
 Nikita Tourani:nrt2117
 
