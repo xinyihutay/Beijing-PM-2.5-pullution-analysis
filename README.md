@@ -44,6 +44,7 @@ proj/
 ├── code/
 ├── data/
 ├── document/
+├── figs/
 └── reference/
 ```
 
