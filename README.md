@@ -40,7 +40,7 @@ Finally, we performed linear regression analysis to select the model consisting 
 
 ```
 proj/
-├── Completed version/
+├── Main/
 ├── code/
 ├── data/
 ├── document/
