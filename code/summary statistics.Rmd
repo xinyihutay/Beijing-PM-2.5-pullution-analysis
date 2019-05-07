@@ -1,0 +1,241 @@
+---
+title: "MSI Project Work"
+author: "Nikita Tourani (nrt2117)"
+date: "May 6, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#setwd("../")
+
+library(data.table)
+
+pm = fread("C:/Users/nrt2117/Downloads/PRSA_data_2010.1.1-2014.12.31.csv")
+dim(pm)
+na_check = apply(is.na(pm),2,sum)
+na_check
+
+del = which(is.na(pm$pm2.5) == TRUE)
+pm_delete_na = pm[-del,]
+nrow(pm) - nrow(pm_delete_na)
+apply(is.na(pm_delete_na),2,sum)
+pm25 = pm_delete_na[,-1]
+
+range(pm25$pm2.5)
+
+summary(pm25$pm2.5)
+summary(pm25$DEWP)
+summary(pm25$TEMP)
+summary(pm25$PRES)
+summary(pm25$Iws)
+table(pm25$cbwd)
+
+#Separating pm2.5 data into levels according to WHO guide
+pm25$index[pm25$pm2.5<=50]<-"Good"
+pm25$index[pm25$pm2.5>=51 & pm25$pm2.5<=100]<-"Moderate"
+pm25$index[pm25$pm2.5>=101 & pm25$pm2.5<=150]<-"Unhealthy for Sensitive Groups"
+pm25$index[pm25$pm2.5>=151 & pm25$pm2.5<=100]<-"Unhealthy"
+pm25$index[pm25$pm2.5>=201 & pm25$pm2.5<=300]<-"Very Unhealthy"
+pm25$index[pm25$pm2.5>=301 & pm25$pm2.5<=500]<-"Hazardous"
+pm25$index[pm25$pm2.5>500]<-"Beyond Index"
+
+#See distribution according to levels
+table(pm25$index)
+counts <- table(pm25$index)
+barplot(counts,main="PM2.5 Level Distribution",xlab="Levels")
+
+#Some graphical representation
+install.packages("ggubr")
+library(ggubr)
+gghistogram(pm,x="pm2.5", bins=50,add = "mean")
+
+#Seasonal distribution
+january <- pm25 %>%
+  filter(month=="1") %>%
+  select(pm2.5,index)
+february <- pm25 %>%
+  filter(month=="2") %>%
+  select(pm2.5,index)
+march <- pm25 %>%
+  filter(month=="3") %>%
+  select(pm2.5,index)
+april <- pm25 %>%
+  filter(month=="4") %>%
+  select(pm2.5,index)
+may <- pm25 %>%
+  filter(month=="5") %>%
+  select(pm2.5,index)
+june <- pm25 %>%
+  filter(month=="6") %>%
+  select(pm2.5,index)
+july <- pm25 %>%
+  filter(month=="7") %>%
+  select(pm2.5,index)
+august <- pm25 %>%
+  filter(month=="8") %>%
+  select(pm2.5,index)
+september <- pm25 %>%
+  filter(month=="9") %>%
+  select(pm2.5,index)
+october <- pm25 %>%
+  filter(month=="10") %>%
+  select(pm2.5,index)
+november <- pm25 %>%
+  filter(month=="11") %>%
+  select(pm2.5,index)
+december <- pm25 %>%
+  filter(month=="12") %>%
+  select(pm2.5,index)
+
+jancounts <- table(january$index)
+barplot(jancounts,main="PM2.5 Level Distribution in January",xlab="Levels")
+febcounts <- table(february$index)
+barplot(febcounts,main="PM2.5 Level Distribution in February",xlab="Levels")
+marcounts <- table(march$index)
+barplot(marcounts,main="PM2.5 Level Distribution in March",xlab="Levels")
+aprcounts <- table(april$index)
+barplot(aprcounts,main="PM2.5 Level Distribution in April",xlab="Levels")
+maycounts <- table(may$index)
+barplot(maycounts,main="PM2.5 Level Distribution in May",xlab="Levels")
+juncounts <- table(june$index)
+barplot(juncounts,main="PM2.5 Level Distribution in June",xlab="Levels")
+julcounts <- table(july$index)
+barplot(julcounts,main="PM2.5 Level Distribution in July",xlab="Levels")
+augcounts <- table(august$index)
+barplot(augcounts,main="PM2.5 Level Distribution in August",xlab="Levels")
+sepcounts <- table(september$index)
+barplot(sepcounts,main="PM2.5 Level Distribution in September",xlab="Levels")
+octcounts <- table(october$index)
+barplot(octcounts,main="PM2.5 Level Distribution in October",xlab="Levels")
+novcounts <- table(november$index)
+barplot(novcounts,main="PM2.5 Level Distribution in November",xlab="Levels")
+deccounts <- table(december$index)
+barplot(deccounts,main="PM2.5 Level Distribution in December",xlab="Levels")
+
+#Look at 24 hour distribution
+hour0 <- pm25 %>%
+  filter(hour=="0") %>%
+  select(pm2.5,index)
+hour1 <- pm25 %>%
+  filter(hour=="1") %>%
+  select(pm2.5,index)
+hour2 <- pm25 %>%
+  filter(hour=="2") %>%
+  select(pm2.5,index)
+hour3 <- pm25 %>%
+  filter(hour=="3") %>%
+  select(pm2.5,index)
+hour4 <- pm25 %>%
+  filter(hour=="4") %>%
+  select(pm2.5,index)
+hour5 <- pm25 %>%
+  filter(hour=="5") %>%
+  select(pm2.5,index)
+hour6 <- pm25 %>%
+  filter(hour=="6") %>%
+  select(pm2.5,index)
+hour7 <- pm25 %>%
+  filter(hour=="7") %>%
+  select(pm2.5,index)
+hour8 <- pm25 %>%
+  filter(hour=="8") %>%
+  select(pm2.5,index)
+hour9 <- pm25 %>%
+  filter(hour=="9") %>%
+  select(pm2.5,index)
+hour10 <- pm25 %>%
+  filter(hour=="10") %>%
+  select(pm2.5,index)
+hour11 <- pm25 %>%
+  filter(hour=="11") %>%
+  select(pm2.5,index)
+hour12 <- pm25 %>%
+  filter(hour=="12") %>%
+  select(pm2.5,index)
+hour13 <- pm25 %>%
+  filter(hour=="13") %>%
+  select(pm2.5,index)
+hour14 <- pm25 %>%
+  filter(hour=="14") %>%
+  select(pm2.5,index)
+hour15 <- pm25 %>%
+  filter(hour=="15") %>%
+  select(pm2.5,index)
+hour16 <- pm25 %>%
+  filter(hour=="16") %>%
+  select(pm2.5,index)
+hour17 <- pm25 %>%
+  filter(hour=="17") %>%
+  select(pm2.5,index)
+hour18 <- pm25 %>%
+  filter(hour=="18") %>%
+  select(pm2.5,index)
+hour19 <- pm25 %>%
+  filter(hour=="19") %>%
+  select(pm2.5,index)
+hour20 <- pm25 %>%
+  filter(hour=="20") %>%
+  select(pm2.5,index)
+hour21 <- pm25 %>%
+  filter(hour=="21") %>%
+  select(pm2.5,index)
+hour22 <- pm25 %>%
+  filter(hour=="22") %>%
+  select(pm2.5,index)
+hour23 <- pm25 %>%
+  filter(hour=="23") %>%
+  select(pm2.5,index)
+
+hour0counts <- table(hour0$index)
+barplot(hour0counts,main="PM2.5 Level Distribution in Hour0",xlab="Levels")
+hour1counts <- table(hour1$index)
+barplot(hour1counts,main="PM2.5 Level Distribution in Hour1",xlab="Levels")
+hour2counts <- table(hour2$index)
+barplot(hour2counts,main="PM2.5 Level Distribution in Hour2",xlab="Levels")
+hour3counts <- table(hour3$index)
+barplot(hour0counts,main="PM2.5 Level Distribution in Hour3",xlab="Levels")
+hour4counts <- table(hour4$index)
+barplot(hour4counts,main="PM2.5 Level Distribution in Hour4",xlab="Levels")
+hour5counts <- table(hour5$index)
+barplot(hour5counts,main="PM2.5 Level Distribution in Hour5",xlab="Levels")
+hour6counts <- table(hour6$index)
+barplot(hour6counts,main="PM2.5 Level Distribution in Hour6",xlab="Levels")
+hour7counts <- table(hour7$index)
+barplot(hour7counts,main="PM2.5 Level Distribution in Hour7",xlab="Levels")
+hour8counts <- table(hour8$index)
+barplot(hour8counts,main="PM2.5 Level Distribution in Hour8",xlab="Levels")
+hour9counts <- table(hour9$index)
+barplot(hour9counts,main="PM2.5 Level Distribution in Hour9",xlab="Levels")
+hour10counts <- table(hour10$index)
+barplot(hour10counts,main="PM2.5 Level Distribution in Hour10",xlab="Levels")
+hour11counts <- table(hour11$index)
+barplot(hour11counts,main="PM2.5 Level Distribution in Hour11",xlab="Levels")
+hour12counts <- table(hour12$index)
+barplot(hour12counts,main="PM2.5 Level Distribution in Hour12",xlab="Levels")
+hour13counts <- table(hour13$index)
+barplot(hour13counts,main="PM2.5 Level Distribution in Hour13",xlab="Levels")
+hour14counts <- table(hour14$index)
+barplot(hour14counts,main="PM2.5 Level Distribution in Hour14",xlab="Levels")
+hour15counts <- table(hour15$index)
+barplot(hour15counts,main="PM2.5 Level Distribution in Hour15",xlab="Levels")
+hour16counts <- table(hour16$index)
+barplot(hour16counts,main="PM2.5 Level Distribution in Hour16",xlab="Levels")
+hour17counts <- table(hour17$index)
+barplot(hour17counts,main="PM2.5 Level Distribution in Hour17",xlab="Levels")
+hour18counts <- table(hour18$index)
+barplot(hour18counts,main="PM2.5 Level Distribution in Hour18",xlab="Levels")
+hour19counts <- table(hour19$index)
+barplot(hour19counts,main="PM2.5 Level Distribution in Hour19",xlab="Levels")
+hour20counts <- table(hour20$index)
+barplot(hour20counts,main="PM2.5 Level Distribution in Hour20",xlab="Levels")
+hour21counts <- table(hour21$index)
+barplot(hour21counts,main="PM2.5 Level Distribution in Hour21",xlab="Levels")
+hour22counts <- table(hour22$index)
+barplot(hour22counts,main="PM2.5 Level Distribution in Hour22",xlab="Levels")
+hour23counts <- table(hour23$index)
+barplot(hour23counts,main="PM2.5 Level Distribution in Hour23",xlab="Levels")
+```
