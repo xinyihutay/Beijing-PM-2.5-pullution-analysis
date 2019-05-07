@@ -1,29 +1,393 @@
 ---
-title: 'GR5223 Project'
+title: "Code"
 output:
-  html_document: default
-  html_notebook: default
   pdf_document: default
+  html_notebook: default
 ---
 
-# Process data
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = FALSE)
+```
 
-```{r Clean data}
+# Section 1: Summary statistics
+```{r summary stats}
 library(data.table)
-library(tseries)
-library(forecast)
-library(dynlm)
-library(glmnet)
-library(ggplot2)
-pm = fread("PRSA_data_2010.1.1-2014.12.31.csv")
-#na_check = apply(is.na(pm),2,sum);na_check
+
+pm = fread("C:/Users/nrt2117/Downloads/PRSA_data_2010.1.1-2014.12.31.csv")
+dim(pm)
+na_check = apply(is.na(pm),2,sum)
+na_check
 
 del = which(is.na(pm$pm2.5) == TRUE)
 pm_delete_na = pm[-del,]
-#apply(is.na(pm_delete_na),2,sum)
+nrow(pm) - nrow(pm_delete_na)
+apply(is.na(pm_delete_na),2,sum)
 pm25 = pm_delete_na[,-1]
-#dim(pm25)
-#range(pm25$pm2.5)
+
+range(pm25$pm2.5)
+
+summary(pm25$pm2.5)
+summary(pm25$DEWP)
+summary(pm25$TEMP)
+summary(pm25$PRES)
+summary(pm25$Iws)
+table(pm25$cbwd)
+
+#Separating pm2.5 data into levels according to WHO guide
+pm25$index[pm25$pm2.5<=50]<-"Good"
+pm25$index[pm25$pm2.5>=51 & pm25$pm2.5<=100]<-"Moderate"
+pm25$index[pm25$pm2.5>=101 & pm25$pm2.5<=150]<-"Unhealthy for Sensitive Groups"
+pm25$index[pm25$pm2.5>=151 & pm25$pm2.5<=100]<-"Unhealthy"
+pm25$index[pm25$pm2.5>=201 & pm25$pm2.5<=300]<-"Very Unhealthy"
+pm25$index[pm25$pm2.5>=301 & pm25$pm2.5<=500]<-"Hazardous"
+pm25$index[pm25$pm2.5>500]<-"Beyond Index"
+
+#See distribution according to levels
+table(pm25$index)
+counts <- table(pm25$index)
+barplot(counts,main="PM2.5 Level Distribution",xlab="Levels")
+
+#Some graphical representation
+install.packages("ggubr")
+library(ggubr)
+gghistogram(pm,x="pm2.5", bins=50,add = "mean")
+
+#Seasonal distribution
+january <- pm25 %>%
+  filter(month=="1") %>%
+  select(pm2.5,index)
+february <- pm25 %>%
+  filter(month=="2") %>%
+  select(pm2.5,index)
+march <- pm25 %>%
+  filter(month=="3") %>%
+  select(pm2.5,index)
+april <- pm25 %>%
+  filter(month=="4") %>%
+  select(pm2.5,index)
+may <- pm25 %>%
+  filter(month=="5") %>%
+  select(pm2.5,index)
+june <- pm25 %>%
+  filter(month=="6") %>%
+  select(pm2.5,index)
+july <- pm25 %>%
+  filter(month=="7") %>%
+  select(pm2.5,index)
+august <- pm25 %>%
+  filter(month=="8") %>%
+  select(pm2.5,index)
+september <- pm25 %>%
+  filter(month=="9") %>%
+  select(pm2.5,index)
+october <- pm25 %>%
+  filter(month=="10") %>%
+  select(pm2.5,index)
+november <- pm25 %>%
+  filter(month=="11") %>%
+  select(pm2.5,index)
+december <- pm25 %>%
+  filter(month=="12") %>%
+  select(pm2.5,index)
+
+jancounts <- table(january$index)
+barplot(jancounts,main="PM2.5 Level Distribution in January",xlab="Levels")
+febcounts <- table(february$index)
+barplot(febcounts,main="PM2.5 Level Distribution in February",xlab="Levels")
+marcounts <- table(march$index)
+barplot(marcounts,main="PM2.5 Level Distribution in March",xlab="Levels")
+aprcounts <- table(april$index)
+barplot(aprcounts,main="PM2.5 Level Distribution in April",xlab="Levels")
+maycounts <- table(may$index)
+barplot(maycounts,main="PM2.5 Level Distribution in May",xlab="Levels")
+juncounts <- table(june$index)
+barplot(juncounts,main="PM2.5 Level Distribution in June",xlab="Levels")
+julcounts <- table(july$index)
+barplot(julcounts,main="PM2.5 Level Distribution in July",xlab="Levels")
+augcounts <- table(august$index)
+barplot(augcounts,main="PM2.5 Level Distribution in August",xlab="Levels")
+sepcounts <- table(september$index)
+barplot(sepcounts,main="PM2.5 Level Distribution in September",xlab="Levels")
+octcounts <- table(october$index)
+barplot(octcounts,main="PM2.5 Level Distribution in October",xlab="Levels")
+novcounts <- table(november$index)
+barplot(novcounts,main="PM2.5 Level Distribution in November",xlab="Levels")
+deccounts <- table(december$index)
+barplot(deccounts,main="PM2.5 Level Distribution in December",xlab="Levels")
+
+#Look at 24 hour distribution
+hour0 <- pm25 %>%
+  filter(hour=="0") %>%
+  select(pm2.5,index)
+hour1 <- pm25 %>%
+  filter(hour=="1") %>%
+  select(pm2.5,index)
+hour2 <- pm25 %>%
+  filter(hour=="2") %>%
+  select(pm2.5,index)
+hour3 <- pm25 %>%
+  filter(hour=="3") %>%
+  select(pm2.5,index)
+hour4 <- pm25 %>%
+  filter(hour=="4") %>%
+  select(pm2.5,index)
+hour5 <- pm25 %>%
+  filter(hour=="5") %>%
+  select(pm2.5,index)
+hour6 <- pm25 %>%
+  filter(hour=="6") %>%
+  select(pm2.5,index)
+hour7 <- pm25 %>%
+  filter(hour=="7") %>%
+  select(pm2.5,index)
+hour8 <- pm25 %>%
+  filter(hour=="8") %>%
+  select(pm2.5,index)
+hour9 <- pm25 %>%
+  filter(hour=="9") %>%
+  select(pm2.5,index)
+hour10 <- pm25 %>%
+  filter(hour=="10") %>%
+  select(pm2.5,index)
+hour11 <- pm25 %>%
+  filter(hour=="11") %>%
+  select(pm2.5,index)
+hour12 <- pm25 %>%
+  filter(hour=="12") %>%
+  select(pm2.5,index)
+hour13 <- pm25 %>%
+  filter(hour=="13") %>%
+  select(pm2.5,index)
+hour14 <- pm25 %>%
+  filter(hour=="14") %>%
+  select(pm2.5,index)
+hour15 <- pm25 %>%
+  filter(hour=="15") %>%
+  select(pm2.5,index)
+hour16 <- pm25 %>%
+  filter(hour=="16") %>%
+  select(pm2.5,index)
+hour17 <- pm25 %>%
+  filter(hour=="17") %>%
+  select(pm2.5,index)
+hour18 <- pm25 %>%
+  filter(hour=="18") %>%
+  select(pm2.5,index)
+hour19 <- pm25 %>%
+  filter(hour=="19") %>%
+  select(pm2.5,index)
+hour20 <- pm25 %>%
+  filter(hour=="20") %>%
+  select(pm2.5,index)
+hour21 <- pm25 %>%
+  filter(hour=="21") %>%
+  select(pm2.5,index)
+hour22 <- pm25 %>%
+  filter(hour=="22") %>%
+  select(pm2.5,index)
+hour23 <- pm25 %>%
+  filter(hour=="23") %>%
+  select(pm2.5,index)
+
+hour0counts <- table(hour0$index)
+barplot(hour0counts,main="PM2.5 Level Distribution in Hour0",xlab="Levels")
+hour1counts <- table(hour1$index)
+barplot(hour1counts,main="PM2.5 Level Distribution in Hour1",xlab="Levels")
+hour2counts <- table(hour2$index)
+barplot(hour2counts,main="PM2.5 Level Distribution in Hour2",xlab="Levels")
+hour3counts <- table(hour3$index)
+barplot(hour0counts,main="PM2.5 Level Distribution in Hour3",xlab="Levels")
+hour4counts <- table(hour4$index)
+barplot(hour4counts,main="PM2.5 Level Distribution in Hour4",xlab="Levels")
+hour5counts <- table(hour5$index)
+barplot(hour5counts,main="PM2.5 Level Distribution in Hour5",xlab="Levels")
+hour6counts <- table(hour6$index)
+barplot(hour6counts,main="PM2.5 Level Distribution in Hour6",xlab="Levels")
+hour7counts <- table(hour7$index)
+barplot(hour7counts,main="PM2.5 Level Distribution in Hour7",xlab="Levels")
+hour8counts <- table(hour8$index)
+barplot(hour8counts,main="PM2.5 Level Distribution in Hour8",xlab="Levels")
+hour9counts <- table(hour9$index)
+barplot(hour9counts,main="PM2.5 Level Distribution in Hour9",xlab="Levels")
+hour10counts <- table(hour10$index)
+barplot(hour10counts,main="PM2.5 Level Distribution in Hour10",xlab="Levels")
+hour11counts <- table(hour11$index)
+barplot(hour11counts,main="PM2.5 Level Distribution in Hour11",xlab="Levels")
+hour12counts <- table(hour12$index)
+barplot(hour12counts,main="PM2.5 Level Distribution in Hour12",xlab="Levels")
+hour13counts <- table(hour13$index)
+barplot(hour13counts,main="PM2.5 Level Distribution in Hour13",xlab="Levels")
+hour14counts <- table(hour14$index)
+barplot(hour14counts,main="PM2.5 Level Distribution in Hour14",xlab="Levels")
+hour15counts <- table(hour15$index)
+barplot(hour15counts,main="PM2.5 Level Distribution in Hour15",xlab="Levels")
+hour16counts <- table(hour16$index)
+barplot(hour16counts,main="PM2.5 Level Distribution in Hour16",xlab="Levels")
+hour17counts <- table(hour17$index)
+barplot(hour17counts,main="PM2.5 Level Distribution in Hour17",xlab="Levels")
+hour18counts <- table(hour18$index)
+barplot(hour18counts,main="PM2.5 Level Distribution in Hour18",xlab="Levels")
+hour19counts <- table(hour19$index)
+barplot(hour19counts,main="PM2.5 Level Distribution in Hour19",xlab="Levels")
+hour20counts <- table(hour20$index)
+barplot(hour20counts,main="PM2.5 Level Distribution in Hour20",xlab="Levels")
+hour21counts <- table(hour21$index)
+barplot(hour21counts,main="PM2.5 Level Distribution in Hour21",xlab="Levels")
+hour22counts <- table(hour22$index)
+barplot(hour22counts,main="PM2.5 Level Distribution in Hour22",xlab="Levels")
+hour23counts <- table(hour23$index)
+barplot(hour23counts,main="PM2.5 Level Distribution in Hour23",xlab="Levels")
+```
+
+# Section 2: Time series analysis
+
+```{r}
+library(data.table)
+library(tseries)
+library(itsmr)
+library(forecast)
+library(dplyr)
+library(plyr)
+path = "~/Desktop/GR5223 Multivariate Stat Inference/Beijing-PM-2.5-pullution-analysis/data"
+pm = fread(paste0(path,"/PRSA_data_2010.1.1-2014.12.31.csv"))
+na_check = apply(is.na(pm),2,sum);na_check
+
+del = which(is.na(pm$pm2.5) == TRUE)
+pm[del,"pm2.5"] = 0
+pm25 = pm[,-1]
+apply(is.na(pm25),2,sum);na_check
+
+pm25_time = as.data.frame(pm25[,c(1,2,3,4,5)])
+aggregate_pm = function(x){
+  return(mean(x$pm2.5))
+}
+pm_daily  = ddply(pm25_time, .(year,month,day), aggregate_pm)
+colnames(pm_daily) = c("year","month","day","pm2.5")
+pm_daily = pm_daily$pm2.5
+
+
+pm_monthly = ddply(pm25_time, .(year,month), aggregate_pm)
+colnames(pm_monthly) = c("year","month","pm2.5")
+pm_monthly = pm_monthly$pm2.5
+
+```
+
+## Part1: Daily PM 2.5 values 
+```{r}
+# time series plot
+plot(1:length(pm_daily),ts(pm_daily),type="l",pch=22,lty=1,pty=2,col = "grey",
+     ylab="PM2.5 concentration(ug/m^3)",xlab = "")
+abline(h=mean(pm_daily),col = "red", lwd = 3, lty = 4)
+
+# logarithmic data
+pm_daily = log(pm_daily[which(pm_daily != 0)])
+plot(1:length(pm_daily),ts(pm_daily),type="l",pch=22,lty=1,pty=2,col="grey",
+     ylab="PM2.5 concentration(ug/m^3)",xlab = "Figure 1-2")
+abline(h=mean(pm_daily),col = "red", lwd = 3, lty = 4)
+
+# ACF and PACF plots
+op = par(mfrow=c(1,2))
+acf(pm_daily,lag.max = 40,
+         xlab = "time lag", ylab = 'ACF',main='ACF')
+acf(pm_daily,lag.max = 40, type = "partial",
+         xlab = "time lag", ylab = 'PACF', main='PACF')
+par(op)
+
+# fit model
+fit_daily = auto.arima(ts(pm_daily))
+fit_daily$coef
+
+# residuals
+daily_res = fit_daily$residuals
+
+# Test residuals 
+Box.test(daily_res,lag=20,type="Box-Pierce") #p-value = 0.9885
+
+qqnorm(daily_res); qqline(daily_res)
+shapiro.test(daily_res)   #p-value < 2.2e-16
+
+matrix(data = c(round(mean(daily_res),5),round(var(daily_res),5)),
+       nrow = 1, byrow = F, dimnames = list(c("Value"),c("Mean","Variance")))
+plot(daily_res, type = "l", 
+     main = "Residuals of fitted MA(2) model", 
+     xlab='', ylab='Residuals')
+
+# Test the stationarity of the PM2.5 data
+Box.test(pm_daily,lag=20,type="Box-Pierce") #p-value < 2.2e-16
+
+shapiro.test(pm_daily)   #p-value = 1.261e-12
+
+adf_daily = adf.test(pm_daily)  #p-value = 0.01
+adf_daily
+
+```
+
+
+## Part 2: Monthly PM 2.5 values 
+
+```{r}
+# time series plot of original monthly data and logarithmic data
+op = par(mfrow=c(1,2))
+plot(1:length(pm_monthly),ts(pm_monthly),type="l",pch=22,lty=1,pty=2,
+     ylab="PM2.5 concentration(ug/m^3)",xlab = "Monthly data")
+abline(h=mean(pm_monthly),col = "red", lwd = 3, lty = 4)
+
+pm_monthly = log(pm_monthly[which(pm_monthly != 0)])
+plot(1:length(pm_monthly),ts(pm_monthly),type="l",pch=22,lty=1,pty=2,
+     ylab="PM2.5 concentration(ug/m^3)",xlab = "log Monthly data")
+abline(h=mean(pm_monthly),col = "red", lwd = 3, lty = 4)
+par(op)
+
+op = par(mfrow=c(1,2))
+# the stationary signal and ACF
+acf(pm_monthly,lag.max = 40,
+         xlab = "lag #", ylab = 'ACF',main=' ')
+# the trend signal and ACF
+acf(pm_monthly,lag.max = 40, type = "partial",
+         xlab = "lag #", ylab = 'PACF', main=' ')
+par(op)
+
+# Fit 2 models
+fit_monthly_ma = Arima(pm_monthly,order=c(0,0,6))
+fit_monthly_ar = Arima(pm_monthly,order=c(6,0,0))
+
+matrix(data = round(c(fit_monthly_ma$aic,fit_monthly_ar$aic),3),
+       nrow = 1, ncol = 2,
+       dimnames = list("AIC",c("MA(6)","AR(6)")))
+fit_monthly_ar$coef
+
+# Test residuals
+monthly_res = fit_monthly_ma$residuals
+Box.test(monthly_res,lag=20,type="Box-Pierce") # p-value = 0.9851
+
+shapiro.test(monthly_res)   #p-value = 0.4591
+
+matrix(data = c(round(mean(monthly_res),5),round(var(monthly_res),5)),
+       byrow = F, nrow = 1, dimnames = list(c("value"),c("Mean","Variance")))
+
+Box.test(pm_monthly,lag=20,type="Box-Pierce") #p-value = 0.1197
+
+shapiro.test(pm_monthly)   #p-value = 0.8307
+
+adf_monthly = adf.test(pm_monthly)  #p-value = 0.04378
+adf_monthly
+
+# Compare models
+fit_daily_error = summary(fit_daily)
+fit_monthly_error = summary(fit_monthly_ma)
+fit_daily_rmse = fit_daily_error[2]
+fit_monthly_rmse = fit_monthly_error[2]
+
+matrix(data = round(c(fit_daily$aic,fit_monthly_ma$aic,
+                fit_daily_rmse,fit_monthly_rmse),3),
+       nrow = 2, byrow = F,
+       dimnames = list(c("Daily PM 2.5","Monthly PM 2.5"),c("AIC","RMSE")))
+
+```
+
+
+# Section 3: Linear regression analysis
+```{r Clean data}
 names(pm25)
 X = pm25[,c("PRES","DEWP","TEMP","Is","Ir","Iws")]
 W = pm25$cbwd
@@ -41,13 +405,9 @@ names(pm_data)
 
 ```
 
-# Time series error
+## Time series error
 
 ```{r regression with ARMA errors}
-#pm_data_w = data.frame(pm25$pm2.5,X,Wind_dir = W)
-#pm_w_ts = ts(pm_data_w)
-#unique(pm_w_ts[,8])
-
 pm_ts = ts(pm_data)
 fit = auto.arima(pm_ts[,1], xreg = as.matrix(pm_ts[,2:7]))
 print(fit)
@@ -65,7 +425,7 @@ forecast_residule = forecast(fit, xreg=as.matrix(pm_ts[,2:7]))
 ```
 
 
-# Fit regression model part
+ Fit regression model part
 
 ```{r transformation}
 #transformation of predictor variable y
@@ -513,6 +873,9 @@ abline(h=0,lty=2)
 lines(supsmu(predict(model.final),rstudent(model.final)),col=2)
 
 ```
+
+
+
 
 
 
