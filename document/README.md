@@ -1,2 +1,2 @@
 # Document folder
-The document directory contains the report or presentation files.
+The document directory contains different verions of edited reports, posters and other document files.
